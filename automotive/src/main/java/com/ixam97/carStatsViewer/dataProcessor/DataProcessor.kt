@@ -61,7 +61,7 @@ class DataProcessor {
 
     private var localSessionsAccess: Boolean = true
 
-    var dataInitialized: Boolean? = null
+    var dataInitialized: Boolean = false
 
     /**
      * List of local copies of the current trips. Used for storing sum values and saving them to
@@ -187,18 +187,29 @@ class DataProcessor {
         //    chargePortConnected = (carPropertiesData.ChargePortConnected.value as Boolean?)?: false
         //)
 
-        realTimeData = realTimeData.copy(
-            speed = if (carPropertiesData.CurrentSpeed.value == null) null else ((carPropertiesData.CurrentSpeed.value as Float?)?: 0f).absoluteValue,
-            power = if (carPropertiesData.CurrentPower.value == null) null else emulatorPowerSign * ((carPropertiesData.CurrentPower.value as Float?)?: 0f),
-            batteryLevel = if (carPropertiesData.BatteryLevel.value == null) null else (carPropertiesData.BatteryLevel.value as Float?)?: 0f,
-            stateOfCharge = if (carPropertiesData.BatteryLevel.value == null) null else ((carPropertiesData.BatteryLevel.value as Float?)?: 0f) / staticVehicleData.batteryCapacity!!,
-            ambientTemperature = if (carPropertiesData.CurrentAmbientTemperature.value == null) null else (carPropertiesData.CurrentAmbientTemperature.value as Float?)?: 0f,
-            selectedGear = if (carPropertiesData.CurrentGear.value == null) null else (carPropertiesData.CurrentGear.value as Int?)?: 0,
-            ignitionState = if (carPropertiesData.CurrentIgnitionState.value == null) null else (carPropertiesData.CurrentIgnitionState.value as Int?)?: 0,
-            chargePortConnected = if (carPropertiesData.ChargePortConnected.value == null) null else (carPropertiesData.ChargePortConnected.value as Boolean?)?: false
-        )
+        if (!staticVehicleData.isEssentialInitialized()) {
+            InAppLogger.w("[NEO] Static vehicle Data not yet available!")
+            return
+        }
 
-        if (!realTimeData.isInitialized() || !staticVehicleData.isInitialized()) {
+        try {
+            realTimeData = realTimeData.copy(
+                speed = if (carPropertiesData.CurrentSpeed.value == null) null else ((carPropertiesData.CurrentSpeed.value as Float?)?: 0f).absoluteValue,
+                power = if (carPropertiesData.CurrentPower.value == null) null else emulatorPowerSign * ((carPropertiesData.CurrentPower.value as Float?)?: 0f),
+                batteryLevel = if (carPropertiesData.BatteryLevel.value == null) null else (carPropertiesData.BatteryLevel.value as Float?)?: 0f,
+                stateOfCharge = if (carPropertiesData.BatteryLevel.value == null) null else ((carPropertiesData.BatteryLevel.value as Float?)?: 0f) / staticVehicleData.batteryCapacity!!,
+                ambientTemperature = if (carPropertiesData.CurrentAmbientTemperature.value == null) null else (carPropertiesData.CurrentAmbientTemperature.value as Float?)?: 0f,
+                selectedGear = if (carPropertiesData.CurrentGear.value == null) null else (carPropertiesData.CurrentGear.value as Int?)?: 0,
+                ignitionState = if (carPropertiesData.CurrentIgnitionState.value == null) null else (carPropertiesData.CurrentIgnitionState.value as Int?)?: 0,
+                chargePortConnected = if (carPropertiesData.ChargePortConnected.value == null) null else (carPropertiesData.ChargePortConnected.value as Boolean?)?: false
+            )
+        } catch (e: Throwable) {
+            InAppLogger.e("[NEO] Failed to update real time data!\n\r${e.stackTraceToString()}")
+            return
+        }
+
+
+        if (!realTimeData.isEssentialInitialized() || !staticVehicleData.isEssentialInitialized()) {
             if (dataInitialized != false) {
                 dataInitialized = false
                 InAppLogger.i("[NEO] Waiting for car properties to be initialized...")
@@ -208,7 +219,7 @@ class DataProcessor {
 
         if (dataInitialized == false) {
             dataInitialized = true
-            InAppLogger.i("[NEO] Car properties initialization complete.")
+            InAppLogger.i("[NEO] Essential Car Properties initialization complete.")
         }
 
         when (carProperty) {
