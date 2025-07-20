@@ -37,7 +37,7 @@ android {
 
         legacy {
             dimension "aaos"
-            applicationId "com.ixam97.carStatsViewer"
+            applicationId "com.wellsy1212.carStatsViewer"
         }
 
         carapp {
