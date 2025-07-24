@@ -12,15 +12,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun CarIconButton(
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-    @DrawableRes iconResId: Int,
-    tint: Color = Color.White,
-    enabled: Boolean = true
-) {
+fun CarIconButton(modifier: Modifier = Modifier, onClick: () -> Unit, @DrawableRes iconResId: Int, tint: Color = Color.White) {
     IconButton(
-        enabled = enabled,
         modifier = modifier
             .padding(10.dp)
             .size(70.dp),
@@ -28,8 +21,8 @@ fun CarIconButton(
     ) {
         Icon(
             painterResource(id = iconResId),
-            tint = tint.copy(alpha = if (enabled) 1f else 0.3f),
-            contentDescription = null,
+            tint = tint,
+            contentDescription = null
         )
     }
 }

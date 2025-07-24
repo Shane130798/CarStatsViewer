@@ -32,12 +32,11 @@ import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.ColumnScrollbar
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
-import java.io.File
 
 fun brandSelector(themeSetting: Int): String? = when (CarStatsViewer.appPreferences.colorTheme) {
     ColorTheme.OEM -> {
-        if (File("/product/fonts/PolestarUnica77-Regular.otf").exists()) "Polestar 2"
-        else if (File("/product/fonts/Unica77PolestarTT-Regular.ttf").exists()) "Polestar 4"
+        if (Build.MODEL == "Polestar 2") Build.MODEL
+        else if (CarStatsViewer.dataProcessor.staticVehicleData.modelName == "PS2") "Polestar 2"
         else Build.BRAND
     }
     ColorTheme.ORANGE -> "Orange"

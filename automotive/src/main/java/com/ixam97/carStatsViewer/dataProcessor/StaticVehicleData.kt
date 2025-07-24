@@ -6,16 +6,7 @@ data class StaticVehicleData(
     val batteryCapacity: Float? = null,
     val vehicleMake: String? = null,
     val modelName: String? = null,
-    val distanceUnit: DistanceUnitEnum? = null
+    val distanceUnit: DistanceUnitEnum = DistanceUnitEnum.KM
 ) {
-    fun isInitialized(): Boolean =
-        isEssentialInitialized() && isOptionalInitialized()
-
-    fun isEssentialInitialized(): Boolean =
-        batteryCapacity != null
-
-    fun isOptionalInitialized(): Boolean =
-        vehicleMake != null
-                && modelName != null
-                && distanceUnit != null
+    fun isInitialized(): Boolean = batteryCapacity != null
 }

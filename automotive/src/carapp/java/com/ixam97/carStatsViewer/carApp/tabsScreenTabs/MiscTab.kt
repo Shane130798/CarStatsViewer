@@ -15,6 +15,7 @@ import com.ixam97.carStatsViewer.R
 import com.ixam97.carStatsViewer.carApp.TabsScreen
 import com.ixam97.carStatsViewer.carApp.RealTimeDataScreen
 import com.ixam97.carStatsViewer.carApp.TripHistoryScreen
+import com.ixam97.carStatsViewer.ui.activities.DebugActivity
 import com.ixam97.carStatsViewer.ui.activities.HistoryActivity
 import com.ixam97.carStatsViewer.ui.activities.MainActivity
 
@@ -34,7 +35,7 @@ internal fun TabsScreen.miscList() = ListTemplate.Builder().apply {
     val historyActivityIntent = Intent(carContext, HistoryActivity::class.java).apply {
         flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }
-    val debugActivityIntent = Intent(carContext, ComposeSettingsActivity::class.java).apply {
+    val debugActivityIntent = Intent(carContext, DebugActivity::class.java).apply {
         flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }
 

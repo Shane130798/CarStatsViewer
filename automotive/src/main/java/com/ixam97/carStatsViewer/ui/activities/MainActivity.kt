@@ -15,6 +15,7 @@ import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.isVisible
 import androidx.fragment.app.FragmentActivity
+import androidx.fragment.app.commit
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -30,6 +31,7 @@ import com.ixam97.carStatsViewer.database.tripData.TripType
 import com.ixam97.carStatsViewer.databinding.ActivityMainBinding
 import com.ixam97.carStatsViewer.emulatorMode
 import com.ixam97.carStatsViewer.emulatorPowerSign
+import com.ixam97.carStatsViewer.ui.fragments.SummaryFragment
 import com.ixam97.carStatsViewer.ui.plot.enums.PlotDimensionSmoothingType
 import com.ixam97.carStatsViewer.ui.plot.enums.PlotDimensionX
 import com.ixam97.carStatsViewer.ui.plot.enums.PlotDimensionY
@@ -49,12 +51,15 @@ import com.ixam97.carStatsViewer.utils.StringFormatters
 import com.ixam97.carStatsViewer.utils.Ticker
 import com.ixam97.carStatsViewer.utils.WatchdogState
 import com.ixam97.carStatsViewer.utils.getColorFromAttribute
+import com.mapbox.maps.extension.style.layers.properties.generated.Visibility
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDate
 import java.util.Calendar
+import java.util.Date
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
@@ -189,7 +194,7 @@ class MainActivity : FragmentActivity() {
 
                     // InAppLogger.v("Real time data: $it")
 
-                    if (it.isEssentialInitialized()) {
+                    if (it.isInitialized()) {
                         neoChargePortConnected = it.chargePortConnected!!
 
                         val instCons = it.instConsumption
@@ -212,9 +217,9 @@ class MainActivity : FragmentActivity() {
                                 mainConsumptionGage.setValue(null as Float?)
                             }
 
-                            mainPowerGage.setValue((it.power?:0f) / 1_000_000f)
+                            mainPowerGage.setValue(it.power!! / 1_000_000f)
 
-                            mainChargeGage.setValue((it.power?:0f) / -1_000_000f)
+                            mainChargeGage.setValue(it.power / -1_000_000f)
                             mainSoCGage.setValue((it.stateOfCharge!! * 100f).roundToInt())
 
                             mainSpeedGage.setValue(
@@ -227,6 +232,19 @@ class MainActivity : FragmentActivity() {
                             if (it.speed > .1 && !moving) {
                                 setSnow(true)
                                 moving = true
+                                val summaryFragment =
+                                    supportFragmentManager.findFragmentByTag("SummaryFragment")
+                                if (summaryFragment != null) {
+                                    supportFragmentManager.commit {
+                                        setCustomAnimations(
+                                            R.anim.slide_in_up,
+                                            R.anim.slide_out_down,
+                                            R.anim.stay_still,
+                                            R.anim.slide_out_down
+                                        )
+                                        remove(summaryFragment)
+                                    }
+                                }
                                 // main_button_summary.isEnabled = false
                                 mainImageButtonSummary.isEnabled = false
                                 mainButtonHistory.isEnabled = false
@@ -329,7 +347,6 @@ class MainActivity : FragmentActivity() {
                     InAppLogger.d("[Watchdog] State changed: $it}")
                     updateLocationStatusIcon(it.locationState)
                     updateConnectionStatusIcon(it.apiState)
-                    updateErrorMessage(it.appErrorState)
                 }
             }
         }
@@ -680,15 +697,6 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    private fun updateErrorMessage(appErrorState: WatchdogState.Companion.AppErrorState) = with(binding) {
-        if (!appErrorState.errorMessage.isNullOrBlank()) {
-            mainErrorMessage.visibility = View.VISIBLE
-            mainErrorMessage.text = appErrorState.errorMessage
-        } else {
-            mainErrorMessage.visibility = View.GONE
-        }
-    }
-
     private fun setupDefaultUi() = with(binding) {
 
         PlotGlobalConfiguration.updateDistanceUnit(appPreferences.distanceUnit)
@@ -867,6 +875,26 @@ class MainActivity : FragmentActivity() {
             val newTripType = if (appPreferences.mainViewTrip >= 3) 0 else appPreferences.mainViewTrip + 1
             CarStatsViewer.dataProcessor.changeSelectedTrip(newTripType + 1)
             appPreferences.mainViewTrip = newTripType
+        }
+    }
+
+    private fun openSummaryFragment() = with(binding) {
+        CoroutineScope(Dispatchers.IO).launch {
+            CarStatsViewer.tripDataSource.getActiveDrivingSessionsIdsMap()[appPreferences.mainViewTrip + 1]?.let {
+                val session = CarStatsViewer.dataProcessor.selectedSessionDataFlow.value // CarStatsViewer.tripDataSource.getFullDrivingSession(it)
+                if (session != null) runOnUiThread {
+                    mainFragmentContainer.visibility = View.VISIBLE
+                    supportFragmentManager.commit {
+                        setCustomAnimations(
+                            R.anim.slide_in_up,
+                            R.anim.stay_still,
+                            R.anim.stay_still,
+                            R.anim.slide_out_down
+                        )
+                        add(R.id.main_fragment_container, SummaryFragment(session), "SummaryFragment")
+                    }
+                }
+            }
         }
     }
 

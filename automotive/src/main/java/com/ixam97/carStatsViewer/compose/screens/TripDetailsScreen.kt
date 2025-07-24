@@ -1,6 +1,5 @@
 package com.ixam97.carStatsViewer.compose.screens
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.view.MotionEvent
 import android.view.View
@@ -91,7 +90,6 @@ import java.util.Date
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
-@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun TripDetailsPortraitScreen(
     viewModel: TripDetailsViewModel,
@@ -798,10 +796,7 @@ fun ChargingSessionDetails(
     } else stringResource(R.string.summary_soc_unavailable)
 
     val context = LocalContext.current
-
-    // TODO: Just for visualization for now...
-    val filteredChargingPoints = (session.chargingPoints?: listOf()).filter { it.power < -500_000 }
-    val plotPoints = DataConverters.chargePlotLineFromChargingPoints(filteredChargingPoints)
+    val plotPoints = DataConverters.chargePlotLineFromChargingPoints(session.chargingPoints?: listOf())
     val defaultLocationText = stringResource(R.string.summary_loading_location)
     var location by remember { mutableStateOf<String?>(defaultLocationText) }
 

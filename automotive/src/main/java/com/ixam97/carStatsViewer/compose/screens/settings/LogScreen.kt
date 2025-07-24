@@ -71,7 +71,7 @@ internal fun LogRow(logEntry: LogEntry) {
             Log.WARN -> polestarOrange
             else -> Color.Gray
         }
-        if (logEntry.message.contains("Car Stats Viewer") && logEntry.type == Log.INFO) {
+        if (logEntry.message.contains("Car Stats Viewer")) {
             color = Color.Green
         }
         Text(

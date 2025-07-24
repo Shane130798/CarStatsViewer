@@ -1,11 +1,9 @@
 package com.ixam97.carStatsViewer.compose
 
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
-import android.util.Patterns
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -15,29 +13,24 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.Firebase
 import com.google.firebase.app
+import com.google.gson.Gson
 import com.ixam97.carStatsViewer.BuildConfig
 import com.ixam97.carStatsViewer.CarStatsViewer
 import com.ixam97.carStatsViewer.R
 import com.ixam97.carStatsViewer.database.log.LogEntry
 import com.ixam97.carStatsViewer.liveDataApi.ConnectionStatus
 import com.ixam97.carStatsViewer.repository.logSubmit.LogSubmitBody
-import com.ixam97.carStatsViewer.repository.logSubmit.LogSubmitRepository
 import com.ixam97.carStatsViewer.ui.views.SnackbarWidget
 import com.ixam97.carStatsViewer.utils.DistanceUnitEnum
 import com.ixam97.carStatsViewer.utils.InAppLogger
-import com.ixam97.carStatsViewer.utils.ScreenshotService
 import com.ixam97.carStatsViewer.utils.logLength
 import com.ixam97.carStatsViewer.utils.logLevel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.text.SimpleDateFormat
-import kotlin.collections.forEach
 
 class SettingsViewModel:
     ViewModel()
@@ -72,11 +65,6 @@ class SettingsViewModel:
         val logLength: Int = 0,
         val debugDelays: Boolean = false,
         val debugColors: Boolean = false,
-        val isScreenshotServiceRunning: Boolean = false,
-        val numberOfScreenshots: Int = 0,
-        val screenshotReceiver: String = "",
-        val validReceiverAddress: Boolean? = null,
-        val userID: String = "Anonymous"
     )
 
     data class ApiSettingsState(
@@ -131,12 +119,7 @@ class SettingsViewModel:
                     loggingLevel = preferences.logLevel,
                     logLength = preferences.logLength,
                     debugDelays = preferences.debugDelays,
-                    debugColors = preferences.debugColors,
-                    isScreenshotServiceRunning = ScreenshotService.screenshotServiceState.value.isServiceRunning,
-                    numberOfScreenshots = ScreenshotService.screenshotServiceState.value.numberOfScreenshots,
-                    screenshotReceiver = preferences.debugScreenshotReceiver,
-                    validReceiverAddress = validateEmailAddress(preferences.debugScreenshotReceiver),
-                    userID = preferences.debugUserID
+                    debugColors = preferences.debugColors
                 )
                 try {
                     settingsState = settingsState.copy(
@@ -161,15 +144,6 @@ class SettingsViewModel:
             }
         }
 
-        viewModelScope.launch {
-            ScreenshotService.screenshotServiceState.collect {
-                devSettingsState = devSettingsState.copy(
-                    isScreenshotServiceRunning = it.isServiceRunning,
-                    numberOfScreenshots = it.numberOfScreenshots
-                )
-            }
-        }
-
     }
 
     fun finishActivity() = _finishActivityLiveData.postValue(Event(true))
@@ -188,9 +162,7 @@ class SettingsViewModel:
         versionClickedNum++
         if (versionClickedNum >= 7 && !isDevEnabled) {
             isDevEnabled = true
-            versionClickedNum = 0
             SnackbarWidget.Builder(context, "Developer Settings enabled!")
-                .setStartDrawable(R.drawable.ic_debug)
                 .setDuration(3_000L)
                 .show()
         }
@@ -219,12 +191,6 @@ class SettingsViewModel:
     fun setAutoAppStart(value: Boolean) {
         settingsState = settingsState.copy(autoAppStart = value)
         preferences.autostart = value
-        CarStatsViewer.setupRestartAlarm(
-            context = CarStatsViewer.appContext,
-            reason = "termination",
-            delay = 9_500,
-            cancel = !preferences.autostart,
-            extendedLogging = true)
     }
     fun setPhoneNotification(value: Boolean) {
         settingsState = settingsState.copy(phoneNotification = value)
@@ -334,60 +300,20 @@ class SettingsViewModel:
         )
     }
 
-    fun submitLog(context: Context) {
-        val snackbar = SnackbarWidget.Builder(context, "Submitting log ...")
-            .setStartDrawable(R.drawable.ic_upload)
-            .show()
+    fun submitLog() {
         viewModelScope.launch {
             withContext(Dispatchers.IO){
+
                 val submitMap = mutableMapOf<Long, String>()
 
                 InAppLogger.getLogEntries(
                     logLevel = preferences.logLevel + 2,
                     logLength = logLengths[preferences.logLength]
                 ).forEach { logEntry ->
-                    val logTimestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(logEntry.epochTime)
-                    val logType = InAppLogger.typeSymbol(logEntry.type)
-                    val logMessage = logEntry.message
-                    logEntry.id?.let {
-                        submitMap[it.toLong()] = "$logTimestamp | $logType: $logMessage"
-                    }
+                    submitMap[logEntry.epochTime] = "${InAppLogger.typeSymbol(logEntry.type)}: ${logEntry.message}"
                 }
-                // Log.d("Log submit debug", Gson().toJson(LogSubmitBody(submitMap)))
-                var resultmsg: String? = null
-                try {
-                    val cpuInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-                        "${Build.SOC_MANUFACTURER} ${Build.SOC_MODEL}"
-                    else
-                        "Unknown"
-                    resultmsg = LogSubmitRepository.submitLog(LogSubmitBody(
-                        log = submitMap,
-                        userID = preferences.debugUserID,
-                        metadata = LogSubmitBody.LogMetadata(
-                            timestamp = System.currentTimeMillis(),
-                            brand = Build.BRAND,
-                            model = Build.MODEL,
-                            device = Build.DEVICE,
-                            appInfo = "${BuildConfig.VERSION_NAME} (${BuildConfig.APPLICATION_ID})",
-                            cpuInfo = cpuInfo
-                        )
-                    ))
-                } catch (e: Exception) {
-                    InAppLogger.e("Failed: ${e.message}\n\r${e.stackTraceToString()}")
-                    resultmsg = e.message
-                }
-                delay(500)
-                withContext(Dispatchers.Main) {
-                    if (resultmsg == null)
-                    {
-                        snackbar.updateStartDrawable(R.drawable.ic_checkmark)
-                        snackbar.updateMessage("Log was submitted successfully.")
-                    } else {
-                        snackbar.setToError()
-                        snackbar.updateMessage("Failed to submit log!\n$resultmsg")
-                    }
-                    snackbar.startDuration(3000)
-                }
+                Log.d("Log submit debug", Gson().toJson(LogSubmitBody(submitMap)))
+                // LogSubmitRepository.submitLog(LogSubmitBody(submitMap))
             }
         }
     }
@@ -404,118 +330,12 @@ class SettingsViewModel:
         }
     }
 
-    fun clearLog(context: Context) {
-        AlertDialog.Builder(context).apply {
-            setTitle("Delete log")
-            setMessage("Are you sure you want to delete the debug log?")
-            setPositiveButton("Confirm") {_,_ ->
-                viewModelScope.launch {
-                    withContext(Dispatchers.IO) {
-                        InAppLogger.resetLog()
-                    }
-                    withContext(Dispatchers.Main) {
-                        SnackbarWidget.Builder(context, "Log has been deleted")
-                            .setStartDrawable(R.drawable.ic_checkmark)
-                            .setDuration(3000)
-                            .show()
-                    }
-                }
-            }
-            setNegativeButton("Cancel") { dialog, _ ->
-                dialog.cancel()
-            }
-            create()
-        }.show()
-    }
-
-    fun debugCrash() {
-        CarStatsViewer.debugCrash()
-    }
-
-    fun scanAvailableFonts() {
+    fun clearLog() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                File("/product/fonts").apply {
-                    if (exists() && isDirectory) {
-                        var fontsList = "Found product fonts:\n\r"
-                        this.listFiles()?.forEach { file ->
-                            fontsList += "    ${file.name}\n\r"
-                        }
-                        InAppLogger.d(fontsList)
-                    }
-                }
-                File("/system/fonts").apply {
-                    if (exists() && isDirectory) {
-                        var fontsList = "Found system fonts:\n\r"
-                        this.listFiles()?.forEach { file ->
-                            fontsList += "    ${file.name}\n\r"
-                        }
-                        InAppLogger.d(fontsList)
-                    }
-                }
+                InAppLogger.resetLog()
             }
         }
     }
 
-    private fun validateEmailAddress(address: String): Boolean? {
-        if (address.isEmpty()) return null
-        return Patterns.EMAIL_ADDRESS.matcher(address).matches()
-    }
-
-    fun setScreenshotReceiver(receiverAddress: String) {
-        val valid = validateEmailAddress(receiverAddress)
-        if (valid != false) {
-            preferences.debugScreenshotReceiver = receiverAddress
-        }
-        devSettingsState = devSettingsState.copy(
-            screenshotReceiver = receiverAddress,
-            validReceiverAddress = valid
-        )
-    }
-
-    fun setUserID(userID: String) {
-        preferences.debugUserID = userID
-        devSettingsState = devSettingsState.copy(
-            userID = preferences.debugUserID
-        )
-    }
-
-    fun submitScreenshots(context: Context) {
-        if (devSettingsState.numberOfScreenshots == 0) {
-            SnackbarWidget.Builder(context, "No Screenshots available.")
-                .setIsError(true)
-                .setDuration(2000)
-                .show()
-            return
-        }
-        val snackbar = SnackbarWidget.Builder(context, "Submitting screenshots ...")
-            .setStartDrawable(R.drawable.ic_upload)
-            .show()
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                var resultmsg: String? = null
-                try {
-                    resultmsg = LogSubmitRepository.uploadImage(
-                        bitmaps = ScreenshotService.screenshotsList,
-                        additionalAddress = preferences.debugScreenshotReceiver.ifBlank { null }
-                    )
-                } catch (e: Exception) {
-                    InAppLogger.e("Failed: ${e.message}\n\r${e.stackTraceToString()}")
-                    resultmsg = e.message
-                }
-                delay(500)
-                withContext(Dispatchers.Main) {
-                    if (resultmsg == null) {
-                        snackbar.updateStartDrawable(R.drawable.ic_checkmark)
-                        snackbar.updateMessage("${devSettingsState.numberOfScreenshots} screenshots submitted successfully.")
-                        ScreenshotService.clearScreenshots()
-                    } else {
-                        snackbar.setToError()
-                        snackbar.updateMessage(resultmsg)
-                    }
-                    snackbar.startDuration(3000)
-                }
-            }
-        }
-    }
 }

@@ -8,8 +8,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,7 +25,6 @@ import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,7 +54,6 @@ fun SideTabLayout(
     tabs: List<SideTab>,
     topLevelBackAction: () -> Unit,
     topLevelTitle: String,
-    initialRoute: String? = null,
     tabsColumnBackground: Color = MaterialTheme.colors.surface,
     navController: NavHostController = rememberNavController()
 ) {
@@ -73,7 +73,7 @@ fun SideTabLayout(
         val width = with(LocalDensity.current){ size.width.toDp() }
         Log.d("WINDOW SIZE", "$width dp")
 
-        if (width < 1400.dp) {
+        if (width < 1300.dp) {
             // Nested navigation for slim displays
             Column(
                 modifier = Modifier.fillMaxSize()
@@ -118,20 +118,13 @@ fun SideTabLayout(
                     }
                 }
             }
-            LaunchedEffect(initialRoute) {
-                initialRoute?.let {
-                    navController.navigate(it)
-                }
-            }
         } else {
             // Wide screens allow for side Tabs
             Row {
                 Column(
                     modifier = Modifier
-                        .width(550.dp)
-                        // TODO: This crashes the app when opening settings menu on wide displays. Will have to find a solution for this. Hotfix for now...
-                        // .width(IntrinsicSize.Max)
-                        // .defaultMinSize(minWidth = 500.dp)
+                        .width(IntrinsicSize.Max)
+                        .defaultMinSize(minWidth = 500.dp)
                         .fillMaxHeight()
                         .background(tabsColumnBackground)
                         // .padding(top = 10.dp),
@@ -197,7 +190,7 @@ fun SideTabLayout(
                 ) {
                     NavHost(
                         navController = navController,
-                        startDestination = initialRoute?:tabs.filter { it.type == SideTab.Type.Tab }[0].route,
+                        startDestination = tabs.filter { it.type == SideTab.Type.Tab }[0].route,
                         enterTransition = { fadeIn() },
                         exitTransition = { fadeOut() },
                         popEnterTransition = { fadeIn() },
@@ -224,11 +217,6 @@ fun SideTabLayout(
                             }
                         }
                     }
-                }
-            }
-            LaunchedEffect(initialRoute) {
-                initialRoute?.let { route ->
-                    selectedIndex = tabs.indexOfFirst { it.route == route }.coerceAtLeast(0)
                 }
             }
         }

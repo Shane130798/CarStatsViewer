@@ -27,10 +27,7 @@ fun CarHeader(
     minimal: Boolean = false,
     headerLineBrush: Brush = CarTheme.brushes.headerLineBrush
 ) {
-    Column(
-        modifier = Modifier
-            .background(MaterialTheme.colors.background)
-    ) {
+    Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
